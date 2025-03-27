@@ -1,0 +1,2 @@
+https://crypto.com/price/ethereum
+http://127.0.0.1:8050/
