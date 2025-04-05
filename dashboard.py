@@ -5,8 +5,8 @@ import pandas as pd
 import os
 
 # Chemins des fichiers
-data_path = "/home/streich/crypto_git/data/data.csv"
-report_path = "/home/streich/crypto_git/data/daily_report.csv"
+data_path = "/home/ubuntu/crypto_dashboard/data/data.csv"
+report_path = "/home/ubuntu/crypto_dashboard/data/daily_report.csv"
 
 # Charger toutes les données
 def load_data():
@@ -101,4 +101,4 @@ def update_report(selected_date):
 
 # Lancer le serveur
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=8050)
+    app.run(debug=True, host="0.0.0.0", port=8050)

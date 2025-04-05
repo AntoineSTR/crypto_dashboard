@@ -3,8 +3,8 @@ import os
 from datetime import datetime
 
 # Charger les données
-file_path = "/home/streich/crypto_git/data/data.csv"
-report_path = "/home/streich/crypto_git/data/daily_report.csv"
+file_path = "/home/ubuntu/crypto_dashboard/data/data.csv"
+report_path = "/home/ubuntu/crypto_dashboard/data/daily_report.csv"
 
 def generate_daily_report():
     if not os.path.exists(file_path):
