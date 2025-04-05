@@ -13,7 +13,7 @@ TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 CLEAN_PRICE=$(echo "$PRICE" | sed 's/[^0-9.]//g')
 
 # Stockage des données dans un fichier CSV propre
-echo "$TIMESTAMP,$CLEAN_PRICE" >> /home/streich/crypto_git/data/data.csv
+echo "$TIMESTAMP,$CLEAN_PRICE" >> /home/ubuntu/crypto_dashboard/data/data.csv
 
 # Affichage pour debug
 echo "[$TIMESTAMP] ETH Price: $CLEAN_PRICE"
