@@ -8,7 +8,7 @@ import os
 data_path = "/home/streich/crypto_git/data/data.csv"
 report_path = "/home/streich/crypto_git/data/daily_report.csv"
 
-# Charger les données
+# Charger toutes les données
 def load_data():
     if os.path.exists(data_path):
         df = pd.read_csv(data_path, names=["timestamp", "price"], dtype=str)
@@ -16,6 +16,10 @@ def load_data():
         df["price"] = df["price"].astype(float)
         return df.dropna()
     return pd.DataFrame(columns=["timestamp", "price"])
+
+# Extraire les dates disponibles dans les données
+def get_available_dates(df):
+    return sorted(df["timestamp"].dt.strftime("%Y-%m-%d").unique(), reverse=True)
 
 # Charger le dernier rapport journalier
 def load_daily_report():
@@ -27,52 +31,72 @@ def load_daily_report():
 # Initialisation de l'application Dash
 app = dash.Dash(__name__)
 
+# Chargement initial
+df = load_data()
+available_dates = get_available_dates(df)
+
 app.layout = html.Div(children=[
-    html.H1("Prix de l'Ethereum en temps réel", style={'textAlign': 'center'}),
-    dcc.Graph(id='live-graph'),
+    html.H1("Prix de l'Ethereum par jour", style={'textAlign': 'center'}),
+
+    # Sélecteur de date
+    html.Div([
+        html.Label("Choisis une date :"),
+        dcc.Dropdown(
+            id='date-dropdown',
+            options=[{'label': date, 'value': date} for date in available_dates],
+            value=available_dates[0] if available_dates else None
+        )
+    ], style={'width': '300px', 'margin': 'auto'}),
+
+    dcc.Graph(id='daily-graph'),
     
-    # Section pour afficher le rapport journalier
     html.Div(id='daily-report', style={'marginTop': '20px', 'textAlign': 'center'}),
-    
-    dcc.Interval(
-        id='interval-component',
-        interval=300000,  # Mise à jour toutes les 5 minutes
-        n_intervals=0
-    )
 ])
 
 @app.callback(
-    Output('live-graph', 'figure'),
-    Input('interval-component', 'n_intervals')
+    Output('daily-graph', 'figure'),
+    Input('date-dropdown', 'value')
 )
-def update_graph(n):
+def update_graph(selected_date):
     df = load_data()
-    if df.empty:
+    if df.empty or not selected_date:
         return {
             'data': [],
             'layout': {'title': 'Aucune donnée disponible', 'xaxis': {'title': 'Temps'}, 'yaxis': {'title': 'Prix (USD)'}}
         }
 
+    df_selected = df[df["timestamp"].dt.strftime("%Y-%m-%d") == selected_date]
+
     return {
-        'data': [{'x': df["timestamp"], 'y': df["price"], 'type': 'line', 'name': 'ETH/USD'}],
-        'layout': {'title': 'Évolution du prix de l’Ethereum', 'xaxis': {'title': 'Temps'}, 'yaxis': {'title': 'Prix (USD)'}}
+        'data': [{'x': df_selected["timestamp"], 'y': df_selected["price"], 'type': 'line', 'name': f'ETH/USD - {selected_date}'}],
+        'layout': {
+            'title': f'Évolution du prix le {selected_date}',
+            'xaxis': {'title': 'Heure'},
+            'yaxis': {'title': 'Prix (USD)'}
+        }
     }
 
 @app.callback(
     Output('daily-report', 'children'),
-    Input('interval-component', 'n_intervals')
+    Input('date-dropdown', 'value')
 )
-def update_report(n):
-    report = load_daily_report()
-    if not report:
+def update_report(selected_date):
+    if not selected_date or not os.path.exists(report_path):
         return html.P("Aucun rapport journalier disponible.")
-    
+
+    df_report = pd.read_csv(report_path)
+    row = df_report[df_report["date"] == selected_date]
+
+    if row.empty:
+        return html.P("Aucun rapport journalier pour cette date.")
+
+    report = row.iloc[0].to_dict()
     return html.Div([
         html.H3(f"Rapport du {report['date']}"),
-        html.P(f"📌 **Prix d'ouverture** : {report['open_price']} USD"),
-        html.P(f"📌 **Prix de clôture** : {report['close_price']} USD"),
-        html.P(f"📌 **Volatilité** : {report['volatility']:.2f} USD"),
-        html.P(f"📌 **Évolution** : {report['evolution']:.2f} %")
+        html.P(f"📌 Prix d'ouverture : {report['open_price']} USD"),
+        html.P(f"📌 Prix de clôture : {report['close_price']} USD"),
+        html.P(f"📌 Volatilité : {report['volatility']:.2f} USD"),
+        html.P(f"📌 Évolution : {report['evolution']:.2f} %")
     ])
 
 # Lancer le serveur
