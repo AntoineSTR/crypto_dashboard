@@ -3,56 +3,73 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import pandas as pd
 import os
+from pytz import timezone
+from datetime import datetime
 
 # Chemins des fichiers
 data_path = "/home/ubuntu/crypto_dashboard/data/data.csv"
 report_path = "/home/ubuntu/crypto_dashboard/data/daily_report.csv"
 
-# Charger toutes les données
+# Charger les données
 def load_data():
     if os.path.exists(data_path):
         df = pd.read_csv(data_path, names=["timestamp", "price"], dtype=str)
-        df["timestamp"] = pd.to_datetime(df["timestamp"].str.strip(), format="%Y-%m-%d %H:%M:%S", errors="coerce")
-        df["price"] = df["price"].astype(float)
-        return df.dropna()
+        df["timestamp"] = pd.to_datetime(df["timestamp"].str.strip(), errors="coerce")
+        df["price"] = pd.to_numeric(df["price"], errors="coerce")
+        df = df.dropna(subset=["timestamp", "price"])
+        return df
     return pd.DataFrame(columns=["timestamp", "price"])
 
-# Extraire les dates disponibles dans les données
+# Extraire les dates disponibles
 def get_available_dates(df):
+    if df.empty or "timestamp" not in df.columns:
+        return []
     return sorted(df["timestamp"].dt.strftime("%Y-%m-%d").unique(), reverse=True)
 
-# Charger le dernier rapport journalier
+# Charger le dernier rapport
 def load_daily_report():
     if os.path.exists(report_path):
         df = pd.read_csv(report_path)
         return df.iloc[-1].to_dict() if not df.empty else None
     return None
 
-# Initialisation de l'application Dash
+# Initialisation Dash
 app = dash.Dash(__name__)
-
-# Chargement initial
-df = load_data()
-available_dates = get_available_dates(df)
+app.title = "Crypto Dashboard"
 
 app.layout = html.Div(children=[
     html.H1("Prix de l'Ethereum par jour", style={'textAlign': 'center'}),
 
-    # Sélecteur de date
     html.Div([
         html.Label("Choisis une date :"),
-        dcc.Dropdown(
-            id='date-dropdown',
-            options=[{'label': date, 'value': date} for date in available_dates],
-            value=available_dates[0] if available_dates else None
-        )
+        dcc.Dropdown(id='date-dropdown', options=[], value=None)
     ], style={'width': '300px', 'margin': 'auto'}),
 
     dcc.Graph(id='daily-graph'),
-    
+
     html.Div(id='daily-report', style={'marginTop': '20px', 'textAlign': 'center'}),
+
+    # Rafraîchissement automatique
+    dcc.Interval(
+        id='interval-refresh',
+        interval=5 * 60 * 1000,  # toutes les 5 minutes
+        n_intervals=0
+    )
 ])
 
+# Callback pour mettre à jour la liste des dates disponibles
+@app.callback(
+    Output('date-dropdown', 'options'),
+    Output('date-dropdown', 'value'),
+    Input('interval-refresh', 'n_intervals')
+)
+def update_available_dates(n):
+    df = load_data()
+    available_dates = get_available_dates(df)
+    options = [{'label': date, 'value': date} for date in available_dates]
+    return options, available_dates[0] if available_dates else None
+
+# Callback pour mettre à jour le graphe
 @app.callback(
     Output('daily-graph', 'figure'),
     Input('date-dropdown', 'value')
@@ -68,7 +85,12 @@ def update_graph(selected_date):
     df_selected = df[df["timestamp"].dt.strftime("%Y-%m-%d") == selected_date]
 
     return {
-        'data': [{'x': df_selected["timestamp"], 'y': df_selected["price"], 'type': 'line', 'name': f'ETH/USD - {selected_date}'}],
+        'data': [{
+            'x': df_selected["timestamp"],
+            'y': df_selected["price"],
+            'type': 'line',
+            'name': f'ETH/USD - {selected_date}'
+        }],
         'layout': {
             'title': f'Évolution du prix le {selected_date}',
             'xaxis': {'title': 'Heure'},
@@ -76,6 +98,7 @@ def update_graph(selected_date):
         }
     }
 
+# Callback pour afficher le rapport
 @app.callback(
     Output('daily-report', 'children'),
     Input('date-dropdown', 'value')
@@ -99,6 +122,6 @@ def update_report(selected_date):
         html.P(f"📌 Évolution : {report['evolution']:.2f} %")
     ])
 
-# Lancer le serveur
+# Lancer le serveur Dash
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=8050)
